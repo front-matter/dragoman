@@ -242,6 +242,267 @@ curl -H "Accept: application/x-bibtex" \
 | 406 | Requested content type not supported |
 | 502 | Upstream API error |
 
+## Deployment (macOS)
+
+### Installation via Homebrew
+
+dragoman can be installed from the [front-matter Homebrew tap](https://github.com/front-matter/homebrew-tap):
+
+```bash
+brew tap front-matter/tap
+brew install dragoman
+```
+
+This builds dragoman from source (requires Rust, installed automatically as a build dependency) and places the binary at `$(brew --prefix)/bin/dragoman`.
+
+#### Recommended SQLite path
+
+```text
+$(brew --prefix)/var/dragoman/commonmeta.sqlite3
+```
+
+Which resolves to:
+
+- `/opt/homebrew/var/dragoman/commonmeta.sqlite3` — Apple Silicon
+- `/usr/local/var/dragoman/commonmeta.sqlite3` — Intel
+
+#### Place the database
+
+```bash
+mkdir -p "$(brew --prefix)/var/dragoman"
+cp commonmeta.sqlite3 "$(brew --prefix)/var/dragoman/commonmeta.sqlite3"
+```
+
+#### Run as a background service (launchd)
+
+```bash
+# Start at login and keep alive
+brew services start dragoman
+
+# Check status
+brew services info dragoman
+
+# View logs
+tail -f "$(brew --prefix)/var/log/dragoman.log"
+
+# Stop the service
+brew services stop dragoman
+```
+
+`brew services start` installs a launchd plist in `~/Library/LaunchAgents/` and starts the service immediately. It restarts automatically on crash and at login.
+
+To run as a system-level daemon (starts at boot, not tied to a user login), use `sudo brew services start dragoman`. This installs the plist in `/Library/LaunchDaemons/` instead.
+
+#### Configuration
+
+To change the port or other settings, edit the service environment variables and restart:
+
+```bash
+# Open the generated plist for editing
+open "$(brew --prefix)/opt/dragoman/homebrew.mxcl.dragoman.plist"
+brew services restart dragoman
+```
+
+### Manual installation (without Homebrew)
+
+```bash
+# Install Rust if not already installed
+curl https://sh.rustup.rs -sSf | sh
+
+git clone https://github.com/front-matter/dragoman
+cd dragoman
+cargo build --release
+sudo cp target/release/dragoman /opt/homebrew/bin/dragoman
+```
+
+> **Intel Macs:** replace `/opt/homebrew` with `/usr/local` in all paths below.
+
+#### Run as a launchd daemon
+
+The bundled `com.front-matter.dragoman.plist` targets Apple Silicon paths.
+
+```bash
+sudo mkdir -p /opt/homebrew/var/dragoman /opt/homebrew/var/log
+sudo cp commonmeta.sqlite3 /opt/homebrew/var/dragoman/commonmeta.sqlite3
+
+sudo cp com.front-matter.dragoman.plist /Library/LaunchDaemons/
+sudo launchctl load -w /Library/LaunchDaemons/com.front-matter.dragoman.plist
+```
+
+Check logs:
+
+```bash
+tail -f /opt/homebrew/var/log/dragoman.log
+```
+
+Stop and disable:
+
+```bash
+sudo launchctl unload -w /Library/LaunchDaemons/com.front-matter.dragoman.plist
+```
+
+### Updating
+
+#### With Homebrew
+
+```bash
+brew upgrade dragoman
+brew services restart dragoman
+```
+
+#### Manual
+
+```bash
+cargo build --release
+sudo cp target/release/dragoman /opt/homebrew/bin/dragoman
+sudo launchctl kickstart -k system/com.front-matter.dragoman
+```
+
+---
+
+## Deployment (Debian / systemd)
+
+This section covers running dragoman as a persistent system service on a Debian 13 server.
+
+### 1. Build the binary
+
+On the server, install Rust and build a release binary:
+
+```bash
+curl https://sh.rustup.rs -sSf | sh
+source ~/.cargo/env
+git clone https://github.com/front-matter/dragoman
+cd dragoman
+cargo build --release
+sudo cp target/release/dragoman /usr/local/bin/dragoman
+```
+
+Or cross-compile locally and copy the binary:
+
+```bash
+# macOS → Linux x86-64 (requires cross)
+cargo install cross
+cross build --release --target x86_64-unknown-linux-gnu
+scp target/x86_64-unknown-linux-gnu/release/dragoman user@server:/usr/local/bin/dragoman
+```
+
+### 2. Create system user and directories
+
+```bash
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin dragoman
+sudo mkdir -p /var/lib/dragoman /etc/dragoman
+sudo chown dragoman:dragoman /var/lib/dragoman
+```
+
+### 3. Place the SQLite database
+
+The recommended database path is `/var/lib/dragoman/commonmeta.sqlite3`:
+
+```bash
+sudo cp commonmeta.sqlite3 /var/lib/dragoman/commonmeta.sqlite3
+sudo chown dragoman:dragoman /var/lib/dragoman/commonmeta.sqlite3
+```
+
+### 4. Create the environment file
+
+```bash
+sudo tee /etc/dragoman/env > /dev/null <<'EOF'
+PORT=3000
+DRAGOMAN_DB=/var/lib/dragoman/commonmeta.sqlite3
+RUST_LOG=dragoman=info
+EOF
+sudo chmod 640 /etc/dragoman/env
+sudo chown root:dragoman /etc/dragoman/env
+```
+
+### 5. Install and enable the systemd unit
+
+```bash
+sudo cp dragoman.service /etc/systemd/system/dragoman.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now dragoman
+```
+
+Check the service is running:
+
+```bash
+sudo systemctl status dragoman
+sudo journalctl -u dragoman -f
+```
+
+### Updating the binary
+
+```bash
+sudo systemctl stop dragoman
+sudo cp target/release/dragoman /usr/local/bin/dragoman
+sudo systemctl start dragoman
+```
+
+### Updating the database
+
+The database file can be replaced while the service is running. dragoman opens
+the SQLite file once at startup; to pick up a new file, restart the service:
+
+```bash
+sudo cp commonmeta-new.sqlite3 /var/lib/dragoman/commonmeta.sqlite3
+sudo chown dragoman:dragoman /var/lib/dragoman/commonmeta.sqlite3
+sudo systemctl restart dragoman
+```
+
+### Reverse proxy
+
+#### Caddy (standalone)
+
+[Caddy](https://caddyserver.com) is the recommended reverse proxy for standalone deployments. It handles TLS certificates automatically via Let's Encrypt.
+
+```bash
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+  | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+  | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt install caddy
+```
+
+Add a site block to `/etc/caddy/Caddyfile`:
+
+```caddy
+doi.example.com {
+    reverse_proxy localhost:3000
+}
+```
+
+Reload Caddy:
+
+```bash
+sudo systemctl reload caddy
+```
+
+#### Traefik via Coolify
+
+If the server already runs [Coolify](https://coolify.io), its Traefik instance can route directly to the dragoman systemd service. Add a file-provider config to the Coolify dynamic configuration directory:
+
+```bash
+sudo tee /data/coolify/proxy/dynamic/dragoman.yml > /dev/null <<'EOF'
+http:
+  routers:
+    dragoman:
+      rule: "Host(`doi.example.com`)"
+      service: dragoman
+      entryPoints:
+        - https
+      tls:
+        certResolver: letsencrypt
+  services:
+    dragoman:
+      loadBalancer:
+        servers:
+          - url: "http://host.docker.internal:3000"
+EOF
+```
+
+Traefik picks up the file automatically — no reload needed. `host.docker.internal` resolves to the host from inside the Traefik container; dragoman must listen on all interfaces (`0.0.0.0:3000`, which is the default).
+
 ## License
 
 MIT

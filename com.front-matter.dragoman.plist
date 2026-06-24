@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.front-matter.dragoman</string>
+
+  <!-- On Intel Macs replace /opt/homebrew with /usr/local throughout -->
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/dragoman</string>
+    <string>start</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PORT</key>
+    <string>3000</string>
+    <key>DRAGOMAN_DB</key>
+    <string>/opt/homebrew/var/dragoman/commonmeta.sqlite3</string>
+    <key>RUST_LOG</key>
+    <string>dragoman=info</string>
+  </dict>
+
+  <key>WorkingDirectory</key>
+  <string>/opt/homebrew/var/dragoman</string>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>/opt/homebrew/var/log/dragoman.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/opt/homebrew/var/log/dragoman.log</string>
+</dict>
+</plist>
