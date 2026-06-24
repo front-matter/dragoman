@@ -1,4 +1,5 @@
 /// Describes a resolved content negotiation result.
+#[derive(Debug, PartialEq)]
 pub struct Negotiated {
     pub format: &'static str,
     pub content_type: &'static str,
@@ -8,6 +9,7 @@ pub struct Negotiated {
     pub locale: Option<String>,
 }
 
+#[derive(Debug)]
 pub enum NegotiateResult {
     /// Serve the matched format.
     Format(Negotiated),
@@ -161,4 +163,215 @@ pub fn content_type_for_format(format: &str) -> Option<&'static str> {
         .iter()
         .find(|(_, f, _)| *f == format)
         .map(|(_, _, ct)| *ct)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── negotiate() ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn empty_accept_redirects() {
+        assert!(matches!(negotiate(""), NegotiateResult::Redirect));
+    }
+
+    #[test]
+    fn html_redirects() {
+        assert!(matches!(negotiate("text/html"), NegotiateResult::Redirect));
+    }
+
+    #[test]
+    fn html_with_charset_redirects() {
+        assert!(matches!(
+            negotiate("text/html; charset=utf-8"),
+            NegotiateResult::Redirect
+        ));
+    }
+
+    #[test]
+    fn wildcard_redirects() {
+        assert!(matches!(negotiate("*/*"), NegotiateResult::Redirect));
+    }
+
+    #[test]
+    fn browser_accept_redirects() {
+        // Typical browser Accept header
+        let browser = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+        assert!(matches!(negotiate(browser), NegotiateResult::Redirect));
+    }
+
+    #[test]
+    fn unsupported_type_returns_406() {
+        assert!(matches!(
+            negotiate("application/rdf+xml"),
+            NegotiateResult::NotAcceptable
+        ));
+    }
+
+    #[test]
+    fn multiple_unsupported_returns_406() {
+        assert!(matches!(
+            negotiate("application/rdf+xml, image/png"),
+            NegotiateResult::NotAcceptable
+        ));
+    }
+
+    #[test]
+    fn unsupported_then_json_falls_through() {
+        // rdf+xml is skipped; application/json is matched as CSL
+        match negotiate("application/rdf+xml, application/json") {
+            NegotiateResult::Format(n) => assert_eq!(n.format, "csl"),
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unsupported_then_wildcard_redirects() {
+        assert!(matches!(
+            negotiate("application/rdf+xml, */*"),
+            NegotiateResult::Redirect
+        ));
+    }
+
+    #[test]
+    fn bibtex_resolves() {
+        match negotiate("application/x-bibtex") {
+            NegotiateResult::Format(n) => {
+                assert_eq!(n.format, "bibtex");
+                assert!(n.content_type.contains("application/x-bibtex"));
+                assert!(n.style.is_none());
+                assert!(n.locale.is_none());
+            }
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ris_resolves() {
+        match negotiate("application/x-research-info-systems") {
+            NegotiateResult::Format(n) => assert_eq!(n.format, "ris"),
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn csl_json_canonical_mime() {
+        match negotiate("application/vnd.citationstyles.csl+json") {
+            NegotiateResult::Format(n) => {
+                assert_eq!(n.format, "csl");
+                assert!(n.content_type.contains("citationstyles.csl+json"));
+            }
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn application_json_falls_back_to_csl() {
+        match negotiate("application/json") {
+            NegotiateResult::Format(n) => assert_eq!(n.format, "csl"),
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn crossref_unixsd_json_alias_maps_to_csl() {
+        match negotiate("application/vnd.crossref.unixsd+json") {
+            NegotiateResult::Format(n) => assert_eq!(n.format, "csl"),
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn schemaorg_ld_json_resolves() {
+        match negotiate("application/vnd.schemaorg.ld+json") {
+            NegotiateResult::Format(n) => assert_eq!(n.format, "schemaorg"),
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ld_json_resolves_to_schemaorg() {
+        match negotiate("application/ld+json") {
+            NegotiateResult::Format(n) => assert_eq!(n.format, "schemaorg"),
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn datacite_json_resolves() {
+        match negotiate("application/vnd.datacite.datacite+json") {
+            NegotiateResult::Format(n) => assert_eq!(n.format, "datacite"),
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn crossref_xml_resolves() {
+        match negotiate("application/vnd.crossref.unixref+xml") {
+            NegotiateResult::Format(n) => assert_eq!(n.format, "crossref_xml"),
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bibliography_without_params() {
+        match negotiate("text/x-bibliography") {
+            NegotiateResult::Format(n) => {
+                assert_eq!(n.format, "citation");
+                assert!(n.style.is_none());
+                assert!(n.locale.is_none());
+            }
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bibliography_with_style() {
+        match negotiate("text/x-bibliography; style=apa") {
+            NegotiateResult::Format(n) => {
+                assert_eq!(n.format, "citation");
+                assert_eq!(n.style.as_deref(), Some("apa"));
+                assert!(n.locale.is_none());
+            }
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn bibliography_with_style_and_locale() {
+        match negotiate("text/x-bibliography; style=apa; locale=de-DE") {
+            NegotiateResult::Format(n) => {
+                assert_eq!(n.format, "citation");
+                assert_eq!(n.style.as_deref(), Some("apa"));
+                assert_eq!(n.locale.as_deref(), Some("de-DE"));
+            }
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn mime_matching_is_case_insensitive() {
+        match negotiate("Application/X-BibTeX") {
+            NegotiateResult::Format(n) => assert_eq!(n.format, "bibtex"),
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    // ── content_type_for_format() ─────────────────────────────────────────────
+
+    #[test]
+    fn known_formats_return_content_type() {
+        for fmt in &["bibtex", "ris", "csl", "schemaorg", "citation", "datacite", "crossref_xml", "commonmeta"] {
+            assert!(
+                content_type_for_format(fmt).is_some(),
+                "format '{fmt}' should have a content type"
+            );
+        }
+    }
+
+    #[test]
+    fn unknown_format_returns_none() {
+        assert!(content_type_for_format("totally-made-up").is_none());
+    }
 }

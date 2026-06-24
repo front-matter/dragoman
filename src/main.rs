@@ -106,12 +106,7 @@ async fn cmd_start(args: StartArgs) {
         tracing::info!(path = %path.display(), "wrote PID file");
     }
 
-    let app = Router::new()
-        .route("/", get(index))
-        .route("/{*path}", get(handle_pid))
-        .with_state(AppState {
-            db: database,
-        });
+    let app = build_app(AppState { db: database });
 
     let addr = SocketAddr::from(([0, 0, 0, 0], args.port));
     let listener = match tokio::net::TcpListener::bind(addr).await {
@@ -367,6 +362,13 @@ async fn resolve_url(
     .map_err(|e| AppError::Internal(e.to_string()))?
 }
 
+fn build_app(state: AppState) -> Router {
+    Router::new()
+        .route("/", get(index))
+        .route("/{*path}", get(handle_pid))
+        .with_state(state)
+}
+
 fn resolve_source(doi: &str, source: Option<&str>) -> String {
     if let Some(s) = source {
         return s.to_lowercase();
@@ -379,5 +381,244 @@ fn resolve_source(doi: &str, source: Option<&str>) -> String {
         Some("crossref") => "crossref".to_string(),
         Some("datacite") => "datacite".to_string(),
         _ => "crossref".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{body::Body, http::Request};
+    use tower::ServiceExt; // for .oneshot()
+
+    /// Test database DDL — mirrors the commonmeta `works` schema.
+    const TEST_DDL: &str = r#"
+        CREATE TABLE works (
+            "id"                TEXT PRIMARY KEY NOT NULL,
+            "type"              TEXT NOT NULL DEFAULT '',
+            "url"               TEXT NOT NULL DEFAULT '',
+            "title"             TEXT NOT NULL DEFAULT '',
+            "additional_titles" TEXT NOT NULL DEFAULT '[]',
+            "contributors"      TEXT NOT NULL DEFAULT '[]',
+            "date_published"    TEXT NOT NULL DEFAULT '',
+            "date_updated"      TEXT NOT NULL DEFAULT '',
+            "dates"             TEXT NOT NULL DEFAULT '{}',
+            "publisher"         TEXT NOT NULL DEFAULT '{}',
+            "container"         TEXT NOT NULL DEFAULT '{}',
+            "description"       TEXT NOT NULL DEFAULT '',
+            "license"           TEXT NOT NULL DEFAULT '{}',
+            "version"           TEXT NOT NULL DEFAULT '',
+            "language"          TEXT NOT NULL DEFAULT '',
+            "subjects"          TEXT NOT NULL DEFAULT '[]',
+            "identifiers"       TEXT NOT NULL DEFAULT '[]',
+            "relations"         TEXT NOT NULL DEFAULT '[]',
+            "references"        TEXT NOT NULL DEFAULT '[]',
+            "funding_references" TEXT NOT NULL DEFAULT '[]',
+            "geo_locations"     TEXT NOT NULL DEFAULT '[]',
+            "files"             TEXT NOT NULL DEFAULT '[]',
+            "archive_locations" TEXT NOT NULL DEFAULT '[]',
+            "provider"          TEXT NOT NULL DEFAULT ''
+        )
+    "#;
+
+    async fn make_test_db() -> (tempfile::TempDir, Arc<libsql::Database>) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("test.sqlite3");
+        let db = libsql::Builder::new_local(&path)
+            .build()
+            .await
+            .unwrap();
+        let conn = db.connect().unwrap();
+        conn.execute_batch(TEST_DDL).await.unwrap();
+        conn.execute(
+            r#"INSERT INTO works ("id", "type", "url", "title", "contributors", "date_published", "provider")
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
+            libsql::params![
+                "https://doi.org/10.1234/test",
+                "JournalArticle",
+                "https://example.com/test-article",
+                "Test Article on Content Negotiation",
+                r#"[{"name": "Doe, Jane", "contributorRoles": ["Author"]}]"#,
+                "2024-01-15",
+                "Crossref"
+            ],
+        )
+        .await
+        .unwrap();
+        (dir, Arc::new(db))
+    }
+
+    fn app_no_db() -> Router {
+        build_app(AppState { db: None })
+    }
+
+    async fn app_with_db() -> (tempfile::TempDir, Router) {
+        let (dir, db) = make_test_db().await;
+        let app = build_app(AppState { db: Some(db) });
+        (dir, app)
+    }
+
+    // ── Index ─────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn index_returns_200() {
+        let response = app_no_db()
+            .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    // ── 404 for non-DOI paths ─────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn non_doi_path_returns_404() {
+        let response = app_no_db()
+            .oneshot(
+                Request::builder()
+                    .uri("/not-a-doi")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn arbitrary_text_path_returns_404() {
+        let response = app_no_db()
+            .oneshot(
+                Request::builder()
+                    .uri("/hello/world")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    // ── 406 for unsupported Accept types ──────────────────────────────────────
+
+    #[tokio::test]
+    async fn unsupported_accept_returns_406() {
+        let response = app_no_db()
+            .oneshot(
+                Request::builder()
+                    .uri("/10.1234/test")
+                    .header("Accept", "application/rdf+xml")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_ACCEPTABLE);
+    }
+
+    #[tokio::test]
+    async fn multiple_unsupported_accept_returns_406() {
+        let response = app_no_db()
+            .oneshot(
+                Request::builder()
+                    .uri("/10.1234/test")
+                    .header("Accept", "application/rdf+xml, image/png")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_ACCEPTABLE);
+    }
+
+    #[tokio::test]
+    async fn invalid_format_query_param_returns_406() {
+        let response = app_no_db()
+            .oneshot(
+                Request::builder()
+                    .uri("/10.1234/test?format=nonsense")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_ACCEPTABLE);
+    }
+
+    // ── DB-backed responses (no live API call) ────────────────────────────────
+
+    #[tokio::test]
+    async fn html_accept_with_db_returns_redirect() {
+        let (_dir, app) = app_with_db().await;
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/10.1234/test")
+                    .header("Accept", "text/html")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::TEMPORARY_REDIRECT);
+        let location = response.headers().get("location").unwrap().to_str().unwrap();
+        assert_eq!(location, "https://example.com/test-article");
+    }
+
+    #[tokio::test]
+    async fn bibtex_accept_with_db_returns_200() {
+        let (_dir, app) = app_with_db().await;
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/10.1234/test")
+                    .header("Accept", "application/x-bibtex")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let ct = response.headers().get("content-type").unwrap().to_str().unwrap();
+        assert!(ct.contains("application/x-bibtex"), "unexpected content-type: {ct}");
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let text = std::str::from_utf8(&body).unwrap();
+        assert!(text.starts_with('@'), "bibtex should start with '@': {text}");
+    }
+
+    #[tokio::test]
+    async fn format_query_param_with_db_returns_bibtex() {
+        let (_dir, app) = app_with_db().await;
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/10.1234/test?format=bibtex")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let ct = response.headers().get("content-type").unwrap().to_str().unwrap();
+        assert!(ct.contains("application/x-bibtex"), "unexpected content-type: {ct}");
+    }
+
+    #[tokio::test]
+    async fn csl_json_accept_with_db_returns_200() {
+        let (_dir, app) = app_with_db().await;
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/10.1234/test")
+                    .header("Accept", "application/vnd.citationstyles.csl+json")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let ct = response.headers().get("content-type").unwrap().to_str().unwrap();
+        assert!(ct.contains("citationstyles.csl+json"), "unexpected content-type: {ct}");
     }
 }
