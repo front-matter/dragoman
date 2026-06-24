@@ -41,7 +41,7 @@ enum Command {
 #[derive(Args)]
 struct StartArgs {
     /// TCP port to listen on.
-    #[arg(short, long, env = "PORT", default_value_t = 3000)]
+    #[arg(short, long, env = "PORT", default_value_t = 3456)]
     port: u16,
 
     /// Path to a local commonmeta SQLite3 database. When set, metadata is

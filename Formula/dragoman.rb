@@ -23,7 +23,7 @@ class Dragoman < Formula
     log_path var/"log/dragoman.log"
     error_log_path var/"log/dragoman.log"
     environment_variables(
-      PORT: "3000",
+      PORT: "3456",
       DRAGOMAN_DB: "#{var}/dragoman/commonmeta.sqlite3",
       RUST_LOG: "dragoman=info",
     )

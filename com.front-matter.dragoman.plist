@@ -16,7 +16,7 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>PORT</key>
-    <string>3000</string>
+    <string>3456</string>
     <key>DRAGOMAN_DB</key>
     <string>/opt/homebrew/var/dragoman/commonmeta.sqlite3</string>
     <key>RUST_LOG</key>

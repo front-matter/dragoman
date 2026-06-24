@@ -33,7 +33,7 @@ You can build a database from any commonmeta-supported source using the [commonm
 ### Start
 
 ```bash
-# Default port 3000
+# Default port 3456
 dragoman start
 
 # Custom port
@@ -70,7 +70,7 @@ cargo run -- start --db /data/commonmeta-2026-06-15.sqlite3
 If the chosen port is already in use, the server logs an error and exits:
 
 ```text
-ERROR dragoman: failed to bind  port=3000  error=Address already in use (os error 48)
+ERROR dragoman: failed to bind  port=3456  error=Address already in use (os error 48)
 ```
 
 Choose a different port with `--port` or stop the process that holds the port.
@@ -108,7 +108,7 @@ Commands:
   help   Print help
 
 dragoman start [OPTIONS]
-  -p, --port <PORT>          TCP port to listen on [env: PORT] [default: 3000]
+  -p, --port <PORT>          TCP port to listen on [env: PORT] [default: 3456]
   -d, --db <PATH>            Local commonmeta SQLite3 database [env: DRAGOMAN_DB]
       --pid-file <PATH>      Write PID to this file on startup [env: DRAGOMAN_PID_FILE]
 
@@ -120,7 +120,7 @@ dragoman stop [OPTIONS]
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `PORT` | `3000` | TCP port to listen on. |
+| `PORT` | `3456` | TCP port to listen on. |
 | `DRAGOMAN_DB` | *(none)* | Path to a local commonmeta SQLite3 database. Metadata is served from the database before falling back to the live API. The server exits on startup if the path is set but the file cannot be opened. |
 | `DRAGOMAN_PID_FILE` | *(none)* | Path for the PID file written by `start` and read by `stop`. |
 | `RUST_LOG` | `dragoman=info` | Log filter (see [`tracing-subscriber`](https://docs.rs/tracing-subscriber)). Use `dragoman=debug` to log per-request cache hits. |
@@ -133,10 +133,10 @@ When the `Accept` header prefers `text/html` or is absent, dragoman redirects to
 
 ```bash
 # Follow the redirect
-curl -L http://localhost:3000/10.5281/zenodo.1089100
+curl -L http://localhost:3456/10.5281/zenodo.1089100
 
 # Inspect the redirect target without following
-curl -s -o /dev/null -w "%{redirect_url}" http://localhost:3000/10.5281/zenodo.1089100
+curl -s -o /dev/null -w "%{redirect_url}" http://localhost:3456/10.5281/zenodo.1089100
 # https://zenodo.org/record/1089100
 ```
 
@@ -148,42 +148,42 @@ Send an `Accept` header to receive metadata instead of a redirect.
 
 ```bash
 curl -H "Accept: application/x-bibtex" \
-     http://localhost:3000/10.5281/zenodo.1089100
+     http://localhost:3456/10.5281/zenodo.1089100
 ```
 
 #### CSL-JSON
 
 ```bash
 curl -H "Accept: application/vnd.citationstyles.csl+json" \
-     http://localhost:3000/10.5281/zenodo.1089100
+     http://localhost:3456/10.5281/zenodo.1089100
 ```
 
 #### DataCite JSON
 
 ```bash
 curl -H "Accept: application/vnd.datacite.datacite+json" \
-     http://localhost:3000/10.5281/zenodo.1089100
+     http://localhost:3456/10.5281/zenodo.1089100
 ```
 
 #### RIS
 
 ```bash
 curl -H "Accept: application/x-research-info-systems" \
-     http://localhost:3000/10.5281/zenodo.1089100
+     http://localhost:3456/10.5281/zenodo.1089100
 ```
 
 #### Crossref XML
 
 ```bash
 curl -H "Accept: application/vnd.crossref.unixref+xml" \
-     http://localhost:3000/10.1016/j.jaci.2019.09.015
+     http://localhost:3456/10.1016/j.jaci.2019.09.015
 ```
 
 #### Schema.org JSON-LD
 
 ```bash
 curl -H "Accept: application/vnd.schemaorg.ld+json" \
-     http://localhost:3000/10.5281/zenodo.1089100
+     http://localhost:3456/10.5281/zenodo.1089100
 ```
 
 #### Formatted citation
@@ -193,11 +193,11 @@ curl -H "Accept: application/vnd.schemaorg.ld+json" \
 ```bash
 # APA (default)
 curl -H "Accept: text/x-bibliography; style=apa" \
-     http://localhost:3000/10.5281/zenodo.1089100
+     http://localhost:3456/10.5281/zenodo.1089100
 
 # Vancouver in French
 curl -H "Accept: text/x-bibliography; style=vancouver; locale=fr-FR" \
-     http://localhost:3000/10.5281/zenodo.1089100
+     http://localhost:3456/10.5281/zenodo.1089100
 ```
 
 ### Query parameter overrides
@@ -205,31 +205,31 @@ curl -H "Accept: text/x-bibliography; style=vancouver; locale=fr-FR" \
 Use `?format=` instead of an `Accept` header:
 
 ```bash
-curl "http://localhost:3000/10.5281/zenodo.1089100?format=bibtex"
-curl "http://localhost:3000/10.5281/zenodo.1089100?format=citation&style=apa&locale=de-DE"
+curl "http://localhost:3456/10.5281/zenodo.1089100?format=bibtex"
+curl "http://localhost:3456/10.5281/zenodo.1089100?format=citation&style=apa&locale=de-DE"
 ```
 
 Force a specific registration agency (useful for testing):
 
 ```bash
 curl -H "Accept: application/x-bibtex" \
-     "http://localhost:3000/10.5281/zenodo.1089100?source=datacite"
+     "http://localhost:3456/10.5281/zenodo.1089100?source=datacite"
 ```
 
 ## Supported formats
 
 | Accept header | `?format=` value | Notes |
 | --- | --- | --- |
-| `application/vnd.citationstyles.csl+json` | `csl` | |
+| `application/x-bibtex` | `bibtex` | |
+| `text/x-bibliography` | `citation` | `style=` and `locale=` params |
 | `application/vnd.commonmeta+json` | `commonmeta` | |
-| `application/vnd.datacite.datacite+json` | `datacite` | |
-| `application/vnd.datacite.datacite+xml` | `datacite_xml` | |
 | `application/vnd.crossref.unixref+xml` | `crossref_xml` | |
 | `application/vnd.crossref.unixsd+xml` | `crossref_xml` | alias |
-| `application/x-bibtex` | `bibtex` | |
+| `application/vnd.citationstyles.csl+json` | `csl` | |
+| `application/vnd.datacite.datacite+json` | `datacite` | |
+| `application/vnd.datacite.datacite+xml` | `datacite_xml` | |
 | `application/x-research-info-systems` | `ris` | |
 | `application/vnd.schemaorg.ld+json` | `schemaorg` | |
-| `text/x-bibliography` | `citation` | `style=` and `locale=` params |
 | `text/html` / *(absent)* | — | 307 redirect to landing page |
 
 ## HTTP status codes
@@ -407,7 +407,7 @@ sudo chown dragoman:dragoman /var/lib/dragoman/commonmeta.sqlite3
 
 ```bash
 sudo tee /etc/dragoman/env > /dev/null <<'EOF'
-PORT=3000
+PORT=3456
 DRAGOMAN_DB=/var/lib/dragoman/commonmeta.sqlite3
 RUST_LOG=dragoman=info
 EOF
@@ -468,7 +468,7 @@ Add a site block to `/etc/caddy/Caddyfile`:
 
 ```caddy
 doi.example.com {
-    reverse_proxy localhost:3000
+    reverse_proxy localhost:3456
 }
 ```
 
@@ -497,11 +497,11 @@ http:
     dragoman:
       loadBalancer:
         servers:
-          - url: "http://host.docker.internal:3000"
+          - url: "http://host.docker.internal:3456"
 EOF
 ```
 
-Traefik picks up the file automatically — no reload needed. `host.docker.internal` resolves to the host from inside the Traefik container; dragoman must listen on all interfaces (`0.0.0.0:3000`, which is the default).
+Traefik picks up the file automatically — no reload needed. `host.docker.internal` resolves to the host from inside the Traefik container; dragoman must listen on all interfaces (`0.0.0.0:3456`, which is the default).
 
 ## License
 
