@@ -215,18 +215,10 @@ struct PidQuery {
 
 // ── HTTP handlers ─────────────────────────────────────────────────────────────
 
-async fn index() -> &'static str {
-    concat!(
-        "dragoman — PID redirection and content negotiation server\n\n",
-        "Usage: GET /{doi}  (e.g. /10.5281/zenodo.1234)\n\n",
-        "Content negotiation via Accept header or ?format= query parameter.\n",
-        "Supported formats: commonmeta, csl, datacite, datacite_xml, crossref_xml,\n",
-        "                   bibtex, ris, schemaorg, citation\n\n",
-        "For formatted citations:\n",
-        "  Accept: text/x-bibliography; style=apa; locale=fr-FR\n",
-        "  or: ?format=citation&style=apa&locale=fr-FR\n\n",
-        "HTTP 302  text/html or */* → redirect to landing page\n",
-        "HTTP 406  unsupported content type\n",
+async fn index() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        include_str!("../site/public/index.html"),
     )
 }
 

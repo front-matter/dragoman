@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ section.title }} — DOI content negotiation</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #222;
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1.25rem;
+    }
+    h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.1rem; margin-top: 2rem; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.25rem; }
+    p { margin: 0.6rem 0; }
+    a { color: #0066cc; }
+    code {
+      font-family: ui-monospace, "SFMono-Regular", monospace;
+      font-size: 0.875em;
+      background: #f3f3f3;
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+    }
+    pre {
+      background: #f3f3f3;
+      border-radius: 5px;
+      padding: 0.85rem 1rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+    }
+    pre code { background: none; padding: 0; font-size: 0.875rem; }
+    table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.9rem; }
+    th { text-align: left; font-weight: 600; padding: 0.4rem 0.6rem; border-bottom: 2px solid #ccc; }
+    td { padding: 0.35rem 0.6rem; border-bottom: 1px solid #e8e8e8; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .subtitle { color: #555; margin-top: 0; }
+  </style>
+</head>
+<body>
+
+<h1>{{ section.title }}</h1>
+<p class="subtitle">DOI content negotiation server &mdash; <a href="https://github.com/front-matter/dragoman">GitHub</a></p>
+
+{{ section.content | safe }}
+
+</body>
+</html>
