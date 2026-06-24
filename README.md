@@ -309,7 +309,7 @@ brew services restart dragoman
 curl https://sh.rustup.rs -sSf | sh
 
 cargo install dragoman
-sudo cp ~/.cargo/bin/dragoman /opt/homebrew/bin/dragoman
+sudo install -m 755 ~/.cargo/bin/dragoman /opt/homebrew/bin/dragoman
 ```
 
 > **Intel Macs:** replace `/opt/homebrew` with `/usr/local` in all paths below.
@@ -351,7 +351,7 @@ brew services restart dragoman
 
 ```bash
 cargo install dragoman
-sudo cp ~/.cargo/bin/dragoman /opt/homebrew/bin/dragoman
+sudo install -m 755 ~/.cargo/bin/dragoman /opt/homebrew/bin/dragoman
 sudo launchctl kickstart -k system/com.front-matter.dragoman
 ```
 
@@ -369,7 +369,7 @@ On the server, install Rust and install the binary:
 curl https://sh.rustup.rs -sSf | sh
 source ~/.cargo/env
 cargo install dragoman
-sudo cp ~/.cargo/bin/dragoman /usr/local/bin/dragoman
+sudo install -m 755 ~/.cargo/bin/dragoman /usr/local/bin/dragoman
 ```
 
 Or cross-compile locally and copy the binary:
@@ -378,7 +378,8 @@ Or cross-compile locally and copy the binary:
 # macOS → Linux x86-64 (requires cross)
 cargo install cross
 cross build --release --target x86_64-unknown-linux-gnu
-scp target/x86_64-unknown-linux-gnu/release/dragoman user@server:/usr/local/bin/dragoman
+scp target/x86_64-unknown-linux-gnu/release/dragoman user@server:/tmp/dragoman
+ssh user@server 'sudo install -m 755 /tmp/dragoman /usr/local/bin/dragoman'
 ```
 
 ### 2. Create system user and directories
@@ -428,9 +429,9 @@ sudo journalctl -u dragoman -f
 ### Updating the binary
 
 ```bash
-sudo systemctl stop dragoman
-sudo cp target/release/dragoman /usr/local/bin/dragoman
-sudo systemctl start dragoman
+cargo install dragoman
+sudo install -m 755 ~/.cargo/bin/dragoman /usr/local/bin/dragoman
+sudo systemctl restart dragoman
 ```
 
 ### Updating the database
