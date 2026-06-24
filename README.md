@@ -11,9 +11,7 @@ A web server for scholarly PID (Persistent Identifier) resolution with full [DOI
 ### Install
 
 ```bash
-git clone https://github.com/front-matter/dragoman
-cd dragoman
-cargo install --path .
+cargo install dragoman
 ```
 
 This builds a release binary and installs it to `~/.cargo/bin/dragoman`. Make sure `~/.cargo/bin` is on your `PATH` (the Rust installer adds this automatically).
@@ -309,10 +307,8 @@ brew services restart dragoman
 # Install Rust if not already installed
 curl https://sh.rustup.rs -sSf | sh
 
-git clone https://github.com/front-matter/dragoman
-cd dragoman
-cargo build --release
-sudo cp target/release/dragoman /opt/homebrew/bin/dragoman
+cargo install dragoman
+sudo cp ~/.cargo/bin/dragoman /opt/homebrew/bin/dragoman
 ```
 
 > **Intel Macs:** replace `/opt/homebrew` with `/usr/local` in all paths below.
@@ -353,8 +349,8 @@ brew services restart dragoman
 #### Manual
 
 ```bash
-cargo build --release
-sudo cp target/release/dragoman /opt/homebrew/bin/dragoman
+cargo install dragoman
+sudo cp ~/.cargo/bin/dragoman /opt/homebrew/bin/dragoman
 sudo launchctl kickstart -k system/com.front-matter.dragoman
 ```
 
@@ -366,15 +362,13 @@ This section covers running dragoman as a persistent system service on a Debian 
 
 ### 1. Build the binary
 
-On the server, install Rust and build a release binary:
+On the server, install Rust and install the binary:
 
 ```bash
 curl https://sh.rustup.rs -sSf | sh
 source ~/.cargo/env
-git clone https://github.com/front-matter/dragoman
-cd dragoman
-cargo build --release
-sudo cp target/release/dragoman /usr/local/bin/dragoman
+cargo install dragoman
+sudo cp ~/.cargo/bin/dragoman /usr/local/bin/dragoman
 ```
 
 Or cross-compile locally and copy the binary:
