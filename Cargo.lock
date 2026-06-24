@@ -1055,7 +1055,9 @@ dependencies = [
 
 [[package]]
 name = "commonmeta"
-version = "0.5.1"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81e6877dae357f4b46c5b1c28fde39269223da0b178a49153510d28b19a54fee"
 dependencies = [
  "ammonia",
  "arrow 59.0.0",
