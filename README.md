@@ -226,6 +226,7 @@ curl -H "Accept: application/x-bibtex" \
 | `application/vnd.citationstyles.csl+json` | `csl` | |
 | `application/vnd.datacite.datacite+json` | `datacite` | |
 | `application/vnd.datacite.datacite+xml` | `datacite_xml` | |
+| `application/vnd.inveniordm.v1+json` | `inveniordm` | |
 | `application/x-research-info-systems` | `ris` | |
 | `application/vnd.schemaorg.ld+json` | `schemaorg` | |
 | `text/html` / *(absent)* | — | 307 redirect to landing page |
