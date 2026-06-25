@@ -45,6 +45,11 @@ static FORMATS: &[(&str, &str, &str)] = &[
         "datacite_xml",
         "application/vnd.datacite.datacite+xml; charset=utf-8",
     ),
+    (
+        "application/vnd.crossref+json",
+        "crossref",
+        "application/vnd.crossref+json; charset=utf-8",
+    ),
     // Unixref is the canonical Crossref XML format per the spec
     (
         "application/vnd.crossref.unixref+xml",
@@ -455,6 +460,17 @@ mod tests {
     // ── content_type_for_format() ─────────────────────────────────────────────
 
     #[test]
+    fn crossref_json_resolves() {
+        match negotiate("application/vnd.crossref+json") {
+            NegotiateResult::Format(n) => {
+                assert_eq!(n.format, "crossref");
+                assert!(n.content_type.contains("application/vnd.crossref+json"));
+            }
+            other => panic!("expected Format, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn inveniordm_resolves() {
         match negotiate("application/vnd.inveniordm.v1+json") {
             NegotiateResult::Format(n) => {
@@ -467,7 +483,7 @@ mod tests {
 
     #[test]
     fn known_formats_return_content_type() {
-        for fmt in &["bibtex", "citation", "commonmeta", "crossref_xml", "csl", "datacite", "inveniordm", "ris", "schemaorg"] {
+        for fmt in &["bibtex", "citation", "commonmeta", "crossref", "crossref_xml", "csl", "datacite", "inveniordm", "ris", "schemaorg"] {
             assert!(
                 content_type_for_format(fmt).is_some(),
                 "format '{fmt}' should have a content type"

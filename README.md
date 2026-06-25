@@ -149,25 +149,25 @@ curl -H "Accept: application/x-bibtex" \
      http://localhost:3456/10.5281/zenodo.1089100
 ```
 
-#### CSL-JSON
+#### RIS
+
+```bash
+curl -H "Accept: application/x-research-info-systems" \
+     http://localhost:3456/10.5281/zenodo.1089100
+```
+
+#### CSL (Citeproc) JSON
 
 ```bash
 curl -H "Accept: application/vnd.citationstyles.csl+json" \
      http://localhost:3456/10.5281/zenodo.1089100
 ```
 
-#### DataCite JSON
+#### Crossref
 
 ```bash
-curl -H "Accept: application/vnd.datacite.datacite+json" \
-     http://localhost:3456/10.5281/zenodo.1089100
-```
-
-#### RIS
-
-```bash
-curl -H "Accept: application/x-research-info-systems" \
-     http://localhost:3456/10.5281/zenodo.1089100
+curl -H "Accept: application/vnd.crossref+json" \
+     http://localhost:3456/10.1016/j.jaci.2019.09.015
 ```
 
 #### Crossref XML
@@ -177,10 +177,24 @@ curl -H "Accept: application/vnd.crossref.unixref+xml" \
      http://localhost:3456/10.1016/j.jaci.2019.09.015
 ```
 
+#### DataCite
+
+```bash
+curl -H "Accept: application/vnd.datacite.datacite+json" \
+     http://localhost:3456/10.5281/zenodo.1089100
+```
+
 #### Schema.org JSON-LD
 
 ```bash
 curl -H "Accept: application/vnd.schemaorg.ld+json" \
+     http://localhost:3456/10.5281/zenodo.1089100
+```
+
+#### InvenioRDM
+
+```bash
+curl -H "Accept: application/vnd.inveniordm.v1+json" \
      http://localhost:3456/10.5281/zenodo.1089100
 ```
 
@@ -207,13 +221,6 @@ curl "http://localhost:3456/10.5281/zenodo.1089100?format=bibtex"
 curl "http://localhost:3456/10.5281/zenodo.1089100?format=citation&style=apa&locale=de-DE"
 ```
 
-Force a specific registration agency (useful for testing):
-
-```bash
-curl -H "Accept: application/x-bibtex" \
-     "http://localhost:3456/10.5281/zenodo.1089100?source=datacite"
-```
-
 ## Supported formats
 
 | Accept header | `?format=` value | Notes |
@@ -221,6 +228,7 @@ curl -H "Accept: application/x-bibtex" \
 | `application/x-bibtex` | `bibtex` | |
 | `text/x-bibliography` | `citation` | `style=` and `locale=` params |
 | `application/vnd.commonmeta+json` | `commonmeta` | |
+| `application/vnd.crossref+json` | `crossref` | |
 | `application/vnd.crossref.unixref+xml` | `crossref_xml` | |
 | `application/vnd.crossref.unixsd+xml` | `crossref_xml` | alias |
 | `application/vnd.citationstyles.csl+json` | `csl` | |
