@@ -1,6 +1,6 @@
 # dragoman
 
-A web server for scholarly PID (Persistent Identifier) resolution with full [DOI content negotiation](https://citation.doi.org/docs.html). Send a DOI as the URL path; receive a redirect to the landing page or metadata in any supported format depending on the `Accept` header.
+A web server for scholarly metadata with full [DOI Resolution](https://www.doi.org/the-identifier/resources/factsheets/doi-resolution-documentation) and [DOI content negotiation](https://citation.doi.org/docs.html). Send a DOI as the URL path; receive a redirect to the landing page or metadata in any supported format depending on the `Accept` header.
 
 ## Installation
 

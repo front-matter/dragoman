@@ -1,10 +1,12 @@
+use std::path::PathBuf;
+
 use commonmeta::Data;
+use rusqlite::{Connection, OpenFlags, params};
 
 use crate::error::AppError;
 
-/// SQLite DDL mirroring the commonmeta `works` table schema.
 #[cfg(test)]
-const TEST_DDL: &str = r#"
+pub(crate) const TEST_DDL: &str = r#"
 CREATE TABLE works (
     "id"                TEXT PRIMARY KEY NOT NULL,
     "type"              TEXT NOT NULL DEFAULT '',
@@ -41,106 +43,76 @@ const SQL: &str = r#"SELECT
     "funding_references", "geo_locations", "files", "archive_locations", "provider"
 FROM works WHERE id = ?1"#;
 
-/// Open a commonmeta SQLite database at `path`.
-///
-/// `libsql::Builder::new_local(...).build()` only records the path; the file
-/// is not actually opened until `connect()` is called.  This function probes
-/// with a real connection so that a missing or unreadable file is caught at
-/// startup rather than on the first request.
-///
-/// The returned `Database` should be stored in application state and reused
-/// across requests.
-pub async fn open(path: &std::path::Path) -> Result<libsql::Database, AppError> {
+fn from_json<T: serde::de::DeserializeOwned + Default>(s: String) -> T {
+    if s.is_empty() {
+        T::default()
+    } else {
+        serde_json::from_str(&s).unwrap_or_default()
+    }
+}
+
+fn connect(path: &PathBuf) -> Result<Connection, AppError> {
+    Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|e| AppError::Internal(format!("sqlite open '{}': {e}", path.display())))
+}
+
+/// Validate that `path` exists and can be opened as a SQLite database.
+/// Returns the path so the caller can store it in `AppState`.
+pub fn open(path: &std::path::Path) -> Result<PathBuf, AppError> {
     if !path.exists() {
         return Err(AppError::Internal(format!(
             "sqlite file not found: '{}'",
             path.display()
         )));
     }
-
-    let db = libsql::Builder::new_local(path)
-        .build()
-        .await
-        .map_err(|e| AppError::Internal(format!("sqlite build '{}': {e}", path.display())))?;
-
-    // Verify the connection actually works before accepting traffic.
-    db.connect()
-        .map_err(|e| AppError::Internal(format!("sqlite connect '{}': {e}", path.display())))?;
-
-    Ok(db)
+    let path = path.to_path_buf();
+    connect(&path)?;
+    Ok(path)
 }
 
 /// Look up a single DOI in a commonmeta SQLite database.
-///
-/// The `doi` argument may be in any form accepted by `validate_doi` (bare
-/// `10.xxx/yyy`, `https://doi.org/...`, etc.).  It is normalised to the
-/// canonical `https://doi.org/10.xxx/yyy` form used as the primary key in
-/// the `works` table.
-///
-/// Returns `Ok(Some(data))` on a hit, `Ok(None)` when the DOI is absent,
-/// or `Err` on an I/O or query error.
-pub async fn lookup(db: &libsql::Database, doi: &str) -> Result<Option<Data>, AppError> {
+pub fn lookup(path: &PathBuf, doi: &str) -> Result<Option<Data>, AppError> {
     let id = commonmeta::doi_utils::normalize_doi(doi);
     if id.is_empty() {
         return Ok(None);
     }
 
-    let conn = db
-        .connect()
-        .map_err(|e| AppError::Internal(format!("sqlite connect: {e}")))?;
+    let conn = connect(path)?;
 
-    let mut rows = conn
-        .query(SQL, libsql::params![id])
-        .await
-        .map_err(|e| AppError::Internal(format!("sqlite query: {e}")))?;
+    let result = conn.query_row(SQL, params![id], |row| {
+        Ok(Data {
+            id: row.get(0)?,
+            type_: row.get(1)?,
+            url: row.get(2)?,
+            title: row.get(3)?,
+            additional_titles: from_json(row.get(4)?),
+            contributors: from_json(row.get(5)?),
+            date_published: row.get(6)?,
+            date_updated: row.get(7)?,
+            dates: from_json(row.get(8)?),
+            publisher: from_json(row.get(9)?),
+            container: from_json(row.get(10)?),
+            description: row.get(11)?,
+            license: from_json(row.get(12)?),
+            version: row.get(13)?,
+            language: row.get(14)?,
+            subjects: from_json(row.get(15)?),
+            identifiers: from_json(row.get(16)?),
+            relations: from_json(row.get(17)?),
+            references: from_json(row.get(18)?),
+            funding_references: from_json(row.get(19)?),
+            geo_locations: from_json(row.get(20)?),
+            files: from_json(row.get(21)?),
+            archive_locations: from_json(row.get(22)?),
+            provider: row.get(23)?,
+            ..Data::default()
+        })
+    });
 
-    match rows
-        .next()
-        .await
-        .map_err(|e| AppError::Internal(e.to_string()))?
-    {
-        None => Ok(None),
-        Some(row) => {
-            fn j<T: serde::de::DeserializeOwned + Default>(s: String) -> T {
-                if s.is_empty() {
-                    T::default()
-                } else {
-                    serde_json::from_str(&s).unwrap_or_default()
-                }
-            }
-            macro_rules! s {
-                ($i:literal) => {
-                    row.get::<String>($i).unwrap_or_default()
-                };
-            }
-            Ok(Some(Data {
-                id: s!(0),
-                type_: s!(1),
-                url: s!(2),
-                title: s!(3),
-                additional_titles: j(s!(4)),
-                contributors: j(s!(5)),
-                date_published: s!(6),
-                date_updated: s!(7),
-                dates: j(s!(8)),
-                publisher: j(s!(9)),
-                container: j(s!(10)),
-                description: s!(11),
-                license: j(s!(12)),
-                version: s!(13),
-                language: s!(14),
-                subjects: j(s!(15)),
-                identifiers: j(s!(16)),
-                relations: j(s!(17)),
-                references: j(s!(18)),
-                funding_references: j(s!(19)),
-                geo_locations: j(s!(20)),
-                files: j(s!(21)),
-                archive_locations: j(s!(22)),
-                provider: s!(23),
-                ..Data::default()
-            }))
-        }
+    match result {
+        Ok(data) => Ok(Some(data)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(AppError::Internal(format!("sqlite query: {e}"))),
     }
 }
 
@@ -149,18 +121,13 @@ mod tests {
     use super::*;
     use std::path::Path;
 
-    /// Create a minimal test database at `path` with one record.
-    async fn make_test_db(path: &Path) -> libsql::Database {
-        let db = libsql::Builder::new_local(path)
-            .build()
-            .await
-            .expect("build test db");
-        let conn = db.connect().expect("connect test db");
-        conn.execute_batch(TEST_DDL).await.expect("create schema");
+    pub(crate) fn make_test_db(path: &Path) -> PathBuf {
+        let conn = Connection::open(path).expect("open test db");
+        conn.execute_batch(TEST_DDL).expect("create schema");
         conn.execute(
             r#"INSERT INTO works ("id", "type", "url", "title", "contributors", "date_published", "provider")
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
-            libsql::params![
+            params![
                 "https://doi.org/10.1234/test",
                 "JournalArticle",
                 "https://example.com/test-article",
@@ -170,68 +137,57 @@ mod tests {
                 "Crossref"
             ],
         )
-        .await
         .expect("insert test record");
-        db
+        path.to_path_buf()
     }
 
-    #[tokio::test]
-    async fn open_rejects_missing_file() {
-        let result = open(Path::new("/nonexistent/path/db.sqlite3")).await;
+    #[test]
+    fn open_rejects_missing_file() {
+        let result = open(Path::new("/nonexistent/path/db.sqlite3"));
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("not found"), "unexpected error: {msg}");
     }
 
-    #[tokio::test]
-    async fn lookup_returns_none_for_unknown_doi() {
+    #[test]
+    fn lookup_returns_none_for_unknown_doi() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.sqlite3");
-        let db = make_test_db(&path).await;
-
-        let result = lookup(&db, "10.9999/does-not-exist").await.unwrap();
+        let path = make_test_db(&dir.path().join("test.sqlite3"));
+        let result = lookup(&path, "10.9999/does-not-exist").unwrap();
         assert!(result.is_none());
     }
 
-    #[tokio::test]
-    async fn lookup_finds_existing_doi() {
+    #[test]
+    fn lookup_finds_existing_doi() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.sqlite3");
-        let db = make_test_db(&path).await;
-
-        let data = lookup(&db, "10.1234/test").await.unwrap().expect("should find DOI");
+        let path = make_test_db(&dir.path().join("test.sqlite3"));
+        let data = lookup(&path, "10.1234/test").unwrap().expect("should find DOI");
         assert_eq!(data.id, "https://doi.org/10.1234/test");
         assert_eq!(data.title, "Test Article on Content Negotiation");
         assert_eq!(data.url, "https://example.com/test-article");
         assert_eq!(data.type_, "JournalArticle");
     }
 
-    #[tokio::test]
-    async fn lookup_normalises_doi_prefix_form() {
+    #[test]
+    fn lookup_normalises_doi_prefix_form() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.sqlite3");
-        let db = make_test_db(&path).await;
-
-        // Bare DOI, HTTPS URL form, and HTTP URL form should all resolve to the same record.
+        let path = make_test_db(&dir.path().join("test.sqlite3"));
         for doi in &[
             "10.1234/test",
             "https://doi.org/10.1234/test",
             "http://dx.doi.org/10.1234/test",
         ] {
             assert!(
-                lookup(&db, doi).await.unwrap().is_some(),
+                lookup(&path, doi).unwrap().is_some(),
                 "should find DOI in form '{doi}'"
             );
         }
     }
 
-    #[tokio::test]
-    async fn lookup_empty_string_returns_none() {
+    #[test]
+    fn lookup_empty_string_returns_none() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("test.sqlite3");
-        let db = make_test_db(&path).await;
-
-        let result = lookup(&db, "").await.unwrap();
-        assert!(result.is_none());
+        let path = make_test_db(&dir.path().join("test.sqlite3"));
+        assert!(lookup(&path, "").unwrap().is_none());
     }
 }

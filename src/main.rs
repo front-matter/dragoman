@@ -86,16 +86,22 @@ async fn main() {
 async fn cmd_start(args: StartArgs) {
     let database = match args.db {
         None => None,
-        Some(ref path) => match db::open(path).await {
-            Ok(d) => {
-                tracing::info!(path = %path.display(), "using local sqlite database");
-                Some(Arc::new(d))
+        Some(ref path) => {
+            let path = path.clone();
+            match tokio::task::spawn_blocking(move || db::open(&path))
+                .await
+                .expect("spawn_blocking panicked")
+            {
+                Ok(db_path) => {
+                    tracing::info!(path = %db_path.display(), "using local sqlite database");
+                    Some(Arc::new(db_path))
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "failed to open database");
+                    std::process::exit(1);
+                }
             }
-            Err(e) => {
-                tracing::error!(path = %path.display(), error = %e, "failed to open database");
-                std::process::exit(1);
-            }
-        },
+        }
     };
 
     if let Some(ref path) = args.pid_file {
@@ -198,7 +204,7 @@ fn cmd_stop(args: StopArgs) {
 
 #[derive(Clone)]
 struct AppState {
-    db: Option<Arc<libsql::Database>>,
+    db: Option<Arc<PathBuf>>,
 }
 
 #[derive(Deserialize)]
@@ -286,30 +292,28 @@ async fn fetch_and_convert(
     source: Option<&str>,
     style: Option<&str>,
     locale: Option<&str>,
-    db: Option<&libsql::Database>,
+    db: Option<&PathBuf>,
 ) -> Result<Vec<u8>, AppError> {
-    if let Some(database) = db {
-        if let Some(data) = db::lookup(database, doi).await? {
-            tracing::debug!(doi = %doi, "served from local sqlite");
-            let format = format.to_string();
-            let style = style.map(str::to_string);
-            let locale = locale.map(str::to_string);
-            return tokio::task::spawn_blocking(move || {
-                commonmeta::write_with_style(&format, &data, style.as_deref(), locale.as_deref())
-                    .map_err(|e| AppError::FetchError(e.to_string()))
-            })
-            .await
-            .map_err(|e| AppError::Internal(e.to_string()))?;
-        }
-    }
-
     let doi = doi.to_string();
     let format = format.to_string();
     let source = source.map(str::to_string);
     let style = style.map(str::to_string);
     let locale = locale.map(str::to_string);
+    let db = db.cloned();
 
     tokio::task::spawn_blocking(move || {
+        if let Some(ref path) = db {
+            if let Some(data) = db::lookup(path, &doi)? {
+                tracing::debug!(doi = %doi, "served from local sqlite");
+                return commonmeta::write_with_style(
+                    &format,
+                    &data,
+                    style.as_deref(),
+                    locale.as_deref(),
+                )
+                .map_err(|e| AppError::FetchError(e.to_string()));
+            }
+        }
         let from = resolve_source(&doi, source.as_deref());
         if format == "citation" {
             commonmeta::convert_citation(&from, &doi, style.as_deref(), locale.as_deref())
@@ -326,21 +330,21 @@ async fn fetch_and_convert(
 async fn resolve_url(
     doi: &str,
     source: Option<&str>,
-    db: Option<&libsql::Database>,
+    db: Option<&PathBuf>,
 ) -> Result<String, AppError> {
-    if let Some(database) = db {
-        if let Some(data) = db::lookup(database, doi).await? {
-            if !data.url.is_empty() {
-                tracing::debug!(doi = %doi, "url served from local sqlite");
-                return Ok(data.url);
-            }
-        }
-    }
-
     let doi = doi.to_string();
     let source = source.map(str::to_string);
+    let db = db.cloned();
 
     tokio::task::spawn_blocking(move || {
+        if let Some(ref path) = db {
+            if let Some(data) = db::lookup(path, &doi)? {
+                if !data.url.is_empty() {
+                    tracing::debug!(doi = %doi, "url served from local sqlite");
+                    return Ok(data.url);
+                }
+            }
+        }
         let from = resolve_source(&doi, source.as_deref());
         let data = commonmeta::read(&from, &doi)
             .map_err(|e| AppError::NotFound(e.to_string()))?;
@@ -442,49 +446,15 @@ mod tests {
     use axum::{body::Body, http::Request};
     use tower::ServiceExt; // for .oneshot()
 
-    /// Test database DDL — mirrors the commonmeta `works` schema.
-    const TEST_DDL: &str = r#"
-        CREATE TABLE works (
-            "id"                TEXT PRIMARY KEY NOT NULL,
-            "type"              TEXT NOT NULL DEFAULT '',
-            "url"               TEXT NOT NULL DEFAULT '',
-            "title"             TEXT NOT NULL DEFAULT '',
-            "additional_titles" TEXT NOT NULL DEFAULT '[]',
-            "contributors"      TEXT NOT NULL DEFAULT '[]',
-            "date_published"    TEXT NOT NULL DEFAULT '',
-            "date_updated"      TEXT NOT NULL DEFAULT '',
-            "dates"             TEXT NOT NULL DEFAULT '{}',
-            "publisher"         TEXT NOT NULL DEFAULT '{}',
-            "container"         TEXT NOT NULL DEFAULT '{}',
-            "description"       TEXT NOT NULL DEFAULT '',
-            "license"           TEXT NOT NULL DEFAULT '{}',
-            "version"           TEXT NOT NULL DEFAULT '',
-            "language"          TEXT NOT NULL DEFAULT '',
-            "subjects"          TEXT NOT NULL DEFAULT '[]',
-            "identifiers"       TEXT NOT NULL DEFAULT '[]',
-            "relations"         TEXT NOT NULL DEFAULT '[]',
-            "references"        TEXT NOT NULL DEFAULT '[]',
-            "funding_references" TEXT NOT NULL DEFAULT '[]',
-            "geo_locations"     TEXT NOT NULL DEFAULT '[]',
-            "files"             TEXT NOT NULL DEFAULT '[]',
-            "archive_locations" TEXT NOT NULL DEFAULT '[]',
-            "provider"          TEXT NOT NULL DEFAULT ''
-        )
-    "#;
-
-    async fn make_test_db() -> (tempfile::TempDir, Arc<libsql::Database>) {
+    fn make_test_db() -> (tempfile::TempDir, Arc<PathBuf>) {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("test.sqlite3");
-        let db = libsql::Builder::new_local(&path)
-            .build()
-            .await
-            .unwrap();
-        let conn = db.connect().unwrap();
-        conn.execute_batch(TEST_DDL).await.unwrap();
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch(db::TEST_DDL).unwrap();
         conn.execute(
             r#"INSERT INTO works ("id", "type", "url", "title", "contributors", "date_published", "provider")
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
-            libsql::params![
+            rusqlite::params![
                 "https://doi.org/10.1234/test",
                 "JournalArticle",
                 "https://example.com/test-article",
@@ -494,17 +464,16 @@ mod tests {
                 "Crossref"
             ],
         )
-        .await
         .unwrap();
-        (dir, Arc::new(db))
+        (dir, Arc::new(path))
     }
 
     fn app_no_db() -> Router {
         build_app(AppState { db: None })
     }
 
-    async fn app_with_db() -> (tempfile::TempDir, Router) {
-        let (dir, db) = make_test_db().await;
+    fn app_with_db() -> (tempfile::TempDir, Router) {
+        let (dir, db) = make_test_db();
         let app = build_app(AppState { db: Some(db) });
         (dir, app)
     }
@@ -600,7 +569,7 @@ mod tests {
 
     #[tokio::test]
     async fn html_accept_with_db_returns_redirect() {
-        let (_dir, app) = app_with_db().await;
+        let (_dir, app) = app_with_db();
         let response = app
             .oneshot(
                 Request::builder()
@@ -618,7 +587,7 @@ mod tests {
 
     #[tokio::test]
     async fn bibtex_accept_with_db_returns_200() {
-        let (_dir, app) = app_with_db().await;
+        let (_dir, app) = app_with_db();
         let response = app
             .oneshot(
                 Request::builder()
@@ -641,7 +610,7 @@ mod tests {
 
     #[tokio::test]
     async fn format_query_param_with_db_returns_bibtex() {
-        let (_dir, app) = app_with_db().await;
+        let (_dir, app) = app_with_db();
         let response = app
             .oneshot(
                 Request::builder()
@@ -658,7 +627,7 @@ mod tests {
 
     #[tokio::test]
     async fn csl_json_accept_with_db_returns_200() {
-        let (_dir, app) = app_with_db().await;
+        let (_dir, app) = app_with_db();
         let response = app
             .oneshot(
                 Request::builder()
