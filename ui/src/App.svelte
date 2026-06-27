@@ -34,6 +34,7 @@
   let bibLoading   = $state(false)
   let bibError     = $state('')
   let copiedCiteId = $state(null)
+  let copiedPreIdx = $state(null)
   let dragId       = $state(null)
   let dropPosition = $state(null)  // { id, before: boolean }
 
@@ -312,6 +313,12 @@
     await navigator.clipboard.writeText(stripHtml(entry.html))
     copiedCiteId = entry.id
     setTimeout(() => { copiedCiteId = null }, 2000)
+  }
+
+  async function copyPre(text, idx) {
+    await navigator.clipboard.writeText(text)
+    copiedPreIdx = idx
+    setTimeout(() => { copiedPreIdx = null }, 2000)
   }
 
 
@@ -687,7 +694,7 @@
               <TableCell class="text-center">✓</TableCell>
             </TableRow>
             <TableRow>
-              <TableCell><a href="https://api.datacite.org/" class="text-primary hover:underline">DataCite XML</a></TableCell>
+              <TableCell><a href="https://datacite-metadata-schema.readthedocs.io/en/4.7/" class="text-primary hover:underline">DataCite XML</a></TableCell>
               <TableCell class="font-mono text-xs">datacite_xml</TableCell>
               <TableCell class="font-mono text-xs">application/vnd.datacite.datacite+xml</TableCell>
               <TableCell class="text-center">✓</TableCell>
@@ -740,34 +747,55 @@
       </div>
     </div>
 
+    {#snippet codeBlock(code, idx)}
+      <div class="relative group my-3">
+        <pre class="!my-0"><code>{code}</code></pre>
+        <button
+          type="button"
+          onclick={() => copyPre(code, idx)}
+          aria-label="Copy"
+          class="absolute top-1.5 right-1.5 h-7 w-7 flex items-center justify-center rounded
+                 text-muted-foreground hover:text-foreground
+                 opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          {#if copiedPreIdx === idx}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-3.5 h-3.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+            </svg>
+          {:else}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="w-3.5 h-3.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
+            </svg>
+          {/if}
+        </button>
+      </div>
+    {/snippet}
+
     <div class="prose prose-sm prose-slate max-w-none
                 [&_h2]:text-primary [&_h2]:border-b [&_h2]:border-border [&_h2]:pb-1
                 [&_a]:text-primary [&_pre]:bg-muted [&_pre]:border [&_pre]:border-border
-                [&_pre]:text-sm [&_pre]:text-gray-800 dark:[&_pre]:text-gray-200
-                [&_pre]:my-3">
+                [&_pre]:text-sm [&_pre]:text-gray-800 dark:[&_pre]:text-gray-200">
 
       <h2>{_('docs.usage.title')}</h2>
       <p>{_('docs.doi_resolution.intro')}</p>
-      <pre><code>GET https://commonmeta.org/10.1371/journal.pcbi.1000204</code></pre>
+      {@render codeBlock('curl https://commonmeta.org/10.1371/journal.pcbi.1000204', 0)}
 
       <h2>{_('docs.content_negotiation.title')}</h2>
       <p>{@html _('docs.content_negotiation.intro')}</p>
       <p>{_('docs.content_negotiation.bibtex_label')}</p>
-      <pre><code>curl -H "Accept: application/x-bibtex" \
-     https://commonmeta.org/10.1371/journal.pcbi.1000204</code></pre>
+      {@render codeBlock(`curl -H "Accept: application/x-bibtex" \\\n     https://commonmeta.org/10.1371/journal.pcbi.1000204`, 1)}
 
       <p>{@html _('docs.content_negotiation.format_param_label')}</p>
-      <pre><code>curl https://commonmeta.org/10.1371/journal.pcbi.1000204?format=bibtex</code></pre>
+      {@render codeBlock('curl https://commonmeta.org/10.1371/journal.pcbi.1000204?format=bibtex', 2)}
 
       <p>{@html _('docs.content_negotiation.citation_style_label')}</p>
-      <pre><code>curl -H "Accept: text/x-bibliography; style=vancouver; locale=de-DE" \
-     https://commonmeta.org/10.1371/journal.pcbi.1000204</code></pre>
+      {@render codeBlock(`curl -H "Accept: text/x-bibliography; style=vancouver; locale=de-DE" \\\n     https://commonmeta.org/10.1371/journal.pcbi.1000204`, 3)}
+
       <p>{_('docs.content_negotiation.query_params_label')}</p>
-      <pre><code>curl "https://commonmeta.org/10.1371/journal.pcbi.1000204?format=citation&style=vancouver&locale=de-DE"</code></pre>
+      {@render codeBlock('curl "https://commonmeta.org/10.1371/journal.pcbi.1000204?format=citation&style=vancouver&locale=de-DE"', 4)}
 
       <p>{@html _('docs.content_negotiation.multiple_types_label')}</p>
-      <pre><code>curl -H "Accept: application/vnd.citationstyles.csl+json;q=0.9, application/x-bibtex" \
-     https://commonmeta.org/10.1371/journal.pcbi.1000204</code></pre>
+      {@render codeBlock(`curl -H "Accept: application/vnd.citationstyles.csl+json;q=0.9, application/x-bibtex" \\\n     https://commonmeta.org/10.1371/journal.pcbi.1000204`, 5)}
     </div>
   </main>
 
