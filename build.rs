@@ -6,18 +6,30 @@ fn main() {
     println!("cargo:rerun-if-changed=ui/vite.config.js");
     println!("cargo:rerun-if-changed=ui/svelte.config.js");
 
+    // When publishing, ui/dist/index.html is included pre-built; skip npm build.
+    if std::path::Path::new("ui/dist/index.html").exists() {
+        return;
+    }
+
     // pnpm may live under Homebrew on macOS; prepend common prefix to PATH.
     let path = std::env::var("PATH").unwrap_or_default();
     let path = format!("/opt/homebrew/bin:/usr/local/bin:{path}");
 
     let ok = std::process::Command::new("pnpm")
+        .args(["--dir", "ui", "install", "--frozen-lockfile"])
+        .env("PATH", &path)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    let ok = ok && std::process::Command::new("pnpm")
         .args(["--dir", "ui", "build"])
         .env("PATH", &path)
         .status()
         .map(|s| s.success())
         .unwrap_or(false);
 
-    if !ok && !std::path::Path::new("ui/dist/index.html").exists() {
+    if !ok {
         panic!(
             "ui/dist/index.html is missing; \
              run: pnpm --dir ui install && pnpm --dir ui build"
