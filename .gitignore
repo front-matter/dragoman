@@ -22,7 +22,3 @@ target
 
 # SQLite database files
 *.sqlite3
-
-# Svelte/Vite frontend
-ui/node_modules/
-ui/dist/
