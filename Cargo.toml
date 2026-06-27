@@ -6,14 +6,6 @@ authors = ["Front Matter <info@front-matter.de>"]
 description = "PID redirection and content negotiation server"
 license = "MIT"
 repository = "https://github.com/front-matter/dragoman"
-include = [
-    "src/**/*",
-    "build.rs",
-    "Cargo.toml",
-    "LICENSE",
-    "README.md",
-    "ui/dist/index.html",
-]
 
 [[bin]]
 name = "dragoman"

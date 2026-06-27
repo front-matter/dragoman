@@ -25,4 +25,3 @@ target
 
 # Svelte/Vite frontend
 node_modules/
-/ui/dist/
