@@ -441,9 +441,17 @@ async fn handle_bibliography(
 fn build_app(state: AppState) -> Router {
     Router::new()
         .route("/", get(index))
+        .route("/commonmeta_v1.0.json", get(schema_json))
         .route("/bibliography", post(handle_bibliography))
         .route("/{*path}", get(handle_pid))
         .with_state(state)
+}
+
+async fn schema_json() -> impl axum::response::IntoResponse {
+    (
+        [(axum::http::header::CONTENT_TYPE, "application/json")],
+        commonmeta::schema_utils::SCHEMA_JSON,
+    )
 }
 
 fn resolve_source(doi: &str, source: Option<&str>) -> String {
@@ -511,6 +519,22 @@ mod tests {
     }
 
     // ── 404 for non-DOI paths ─────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn schema_json_returns_json() {
+        let response = app_no_db()
+            .oneshot(
+                Request::builder()
+                    .uri("/commonmeta_v1.0.json")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let ct = response.headers().get("content-type").unwrap().to_str().unwrap();
+        assert!(ct.contains("application/json"));
+    }
 
     #[tokio::test]
     async fn non_doi_path_returns_404() {

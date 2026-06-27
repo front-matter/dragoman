@@ -21,5 +21,5 @@
   "docs.content_negotiation.citation_style_label": "Para citas con formato, pasa el estilo y el idioma mediante la cabecera <code>Accept</code> (estilo por defecto: <code>apa</code>, idioma por defecto: <code>en-US</code>):",
   "docs.content_negotiation.query_params_label": "O usa parámetros de consulta:",
   "docs.content_negotiation.multiple_types_label": "Se admiten varios tipos de contenido con pesos <code>q=</code> según la <a href=\"https://www.rfc-editor.org/rfc/rfc7231#section-5.3.2\" target=\"_blank\" rel=\"noreferrer\">RFC 7231</a>:",
-  "footer.copyright": "Copyright &copy;2023&ndash;2026 Commonmeta. Desarrollado con <a href=\"https://github.com/front-matter/dragoman\" target=\"_blank\" rel=\"noreferrer\">dragoman</a> y <a href=\"https://github.com/front-matter/commonmeta-rs\" target=\"_blank\" rel=\"noreferrer\">commonmeta-rs</a> por <a href=\"https://front-matter.de\" target=\"_blank\" rel=\"noreferrer\">Front Matter</a>."
+  "footer.copyright": "Copyright &copy;2023&ndash;2026 Commonmeta. Desarrollado con <a href=\"https://codeberg.org/front-matter/dragoman\" target=\"_blank\" rel=\"noreferrer\">dragoman</a> y <a href=\"https://codeberg.org/front-matter/commonmeta-rs\" target=\"_blank\" rel=\"noreferrer\">commonmeta-rs</a> por <a href=\"https://front-matter.de\" target=\"_blank\" rel=\"noreferrer\">Front Matter</a>."
 }

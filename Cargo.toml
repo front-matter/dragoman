@@ -1,11 +1,11 @@
 [package]
 name = "dragoman"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 authors = ["Front Matter <info@front-matter.de>"]
 description = "DOI redirection and content negotiation server"
 license = "MIT"
-repository = "https://github.com/front-matter/dragoman"
+repository = "https://codeberg.org/front-matter/dragoman"
 
 [[bin]]
 name = "dragoman"
