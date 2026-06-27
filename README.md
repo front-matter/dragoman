@@ -50,7 +50,7 @@ dragoman start --port 8080 --db /data/commonmeta-2026-06-15.sqlite3 --pid-file /
 Options can also be supplied as environment variables (flags take precedence):
 
 ```bash
-PORT=8080 DRAGOMAN_DB=/data/commonmeta-2026-06-15.sqlite3 RUST_LOG=dragoman=debug dragoman start
+PORT=8080 COMMONMETA_DB=/data/commonmeta-2026-06-15.sqlite3 RUST_LOG=dragoman=debug dragoman start
 ```
 
 During development you can use `cargo run` in place of the installed binary:
@@ -73,15 +73,15 @@ ERROR dragoman: failed to bind  port=3456  error=Address already in use (os erro
 
 Choose a different port with `--port` or stop the process that holds the port.
 
-### Error: database file not found
+### Database file not found
 
-If `--db` points to a path that does not exist, the server exits at startup before accepting any traffic:
+If the resolved database path does not exist, dragoman logs a warning and starts without a local database, falling back to the live API for all requests:
 
 ```text
-ERROR dragoman: failed to open database  path=…  error=sqlite file not found: '…'
+WARN dragoman: sqlite file not found, running without local database  path=…
 ```
 
-Pass the correct path or an absolute path to avoid working-directory ambiguity.
+To use a local database, place the SQLite file at the platform default path or set `COMMONMETA_DB` to its location.
 
 ### Stop
 
@@ -107,7 +107,7 @@ Commands:
 
 dragoman start [OPTIONS]
   -p, --port <PORT>          TCP port to listen on [env: PORT] [default: 3456]
-  -d, --db <PATH>            Local commonmeta SQLite3 database [env: DRAGOMAN_DB]
+  -d, --db <PATH>            Local commonmeta SQLite3 database [env: COMMONMETA_DB]
       --pid-file <PATH>      Write PID to this file on startup [env: DRAGOMAN_PID_FILE]
 
 dragoman stop [OPTIONS]
@@ -119,7 +119,7 @@ dragoman stop [OPTIONS]
 | Variable | Default | Description |
 | --- | --- | --- |
 | `PORT` | `3456` | TCP port to listen on. |
-| `DRAGOMAN_DB` | *(none)* | Path to a local commonmeta SQLite3 database. Metadata is served from the database before falling back to the live API. The server exits on startup if the path is set but the file cannot be opened. |
+| `COMMONMETA_DB` | *(platform default)* | Path to a local commonmeta SQLite3 database. Metadata is served from the database before falling back to the live API. If the file does not exist, a warning is logged and the server starts without a local database. Platform defaults: macOS → `~/Library/Application Support/commonmeta/commonmeta.sqlite3`; Linux → `/var/lib/commonmeta/commonmeta.sqlite3`. |
 | `DRAGOMAN_PID_FILE` | *(none)* | Path for the PID file written by `start` and read by `stop`. |
 | `RUST_LOG` | `dragoman=info` | Log filter (see [`tracing-subscriber`](https://docs.rs/tracing-subscriber)). Use `dragoman=debug` to log per-request cache hits. |
 
@@ -262,23 +262,16 @@ brew install dragoman
 
 This builds dragoman from source (requires Rust, installed automatically as a build dependency) and places the binary at `$(brew --prefix)/bin/dragoman`.
 
-#### Recommended SQLite path
-
-```text
-$(brew --prefix)/var/dragoman/commonmeta.sqlite3
-```
-
-Which resolves to:
-
-- `/opt/homebrew/var/dragoman/commonmeta.sqlite3` — Apple Silicon
-- `/usr/local/var/dragoman/commonmeta.sqlite3` — Intel
-
 #### Place the database
 
+The platform default path on macOS is `~/Library/Application Support/commonmeta/commonmeta.sqlite3`. Place the database there and no further configuration is needed:
+
 ```bash
-mkdir -p "$(brew --prefix)/var/dragoman"
-cp commonmeta.sqlite3 "$(brew --prefix)/var/dragoman/commonmeta.sqlite3"
+mkdir -p "$HOME/Library/Application Support/commonmeta"
+cp commonmeta.sqlite3 "$HOME/Library/Application Support/commonmeta/commonmeta.sqlite3"
 ```
+
+To use a different path, set `COMMONMETA_DB` in the launchd plist or pass `--db` on the command line.
 
 #### Run as a background service (launchd)
 
@@ -394,25 +387,26 @@ ssh user@server 'sudo install -m 755 /tmp/dragoman /usr/local/bin/dragoman'
 
 ```bash
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin dragoman
-sudo mkdir -p /var/lib/dragoman /etc/dragoman
-sudo chown dragoman:dragoman /var/lib/dragoman
+sudo mkdir -p /var/lib/commonmeta /etc/dragoman
+sudo chown dragoman:dragoman /var/lib/commonmeta
 ```
 
 ### 3. Place the SQLite database
 
-The recommended database path is `/var/lib/dragoman/commonmeta.sqlite3`:
+The platform default path on Linux is `/var/lib/commonmeta/commonmeta.sqlite3`. Place the database there and no further configuration is needed:
 
 ```bash
-sudo cp commonmeta.sqlite3 /var/lib/dragoman/commonmeta.sqlite3
-sudo chown dragoman:dragoman /var/lib/dragoman/commonmeta.sqlite3
+sudo cp commonmeta.sqlite3 /var/lib/commonmeta/commonmeta.sqlite3
+sudo chown dragoman:dragoman /var/lib/commonmeta/commonmeta.sqlite3
 ```
+
+To use a different path, set `COMMONMETA_DB` in the environment file instead.
 
 ### 4. Create the environment file
 
 ```bash
 sudo tee /etc/dragoman/env > /dev/null <<'EOF'
 PORT=3456
-DRAGOMAN_DB=/var/lib/dragoman/commonmeta.sqlite3
 RUST_LOG=dragoman=info
 EOF
 sudo chmod 640 /etc/dragoman/env
@@ -448,8 +442,8 @@ The database file can be replaced while the service is running. dragoman opens
 the SQLite file once at startup; to pick up a new file, restart the service:
 
 ```bash
-sudo cp commonmeta-new.sqlite3 /var/lib/dragoman/commonmeta.sqlite3
-sudo chown dragoman:dragoman /var/lib/dragoman/commonmeta.sqlite3
+sudo cp commonmeta-new.sqlite3 /var/lib/commonmeta/commonmeta.sqlite3
+sudo chown dragoman:dragoman /var/lib/commonmeta/commonmeta.sqlite3
 sudo systemctl restart dragoman
 ```
 

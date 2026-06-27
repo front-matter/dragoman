@@ -44,9 +44,10 @@ struct StartArgs {
     #[arg(short, long, env = "PORT", default_value_t = 3456)]
     port: u16,
 
-    /// Path to a local commonmeta SQLite3 database. When set, metadata is
-    /// served from the database before falling back to the live API.
-    #[arg(short, long, env = "DRAGOMAN_DB")]
+    /// Path to a local commonmeta SQLite3 database. Falls back to the
+    /// COMMONMETA_DB environment variable, then the platform default
+    /// (~/.local/share/commonmeta/commonmeta.sqlite3 on Linux).
+    #[arg(short, long, env = "COMMONMETA_DB")]
     db: Option<PathBuf>,
 
     /// Write the server PID to this file on startup so that `dragoman stop`
@@ -83,23 +84,43 @@ async fn main() {
 
 // ── `start` ──────────────────────────────────────────────────────────────────
 
+fn platform_default_db_path() -> PathBuf {
+    #[cfg(target_os = "macos")]
+    {
+        let home = std::env::var("HOME").unwrap_or_default();
+        PathBuf::from(format!(
+            "{}/Library/Application Support/commonmeta/commonmeta.sqlite3",
+            home
+        ))
+    }
+    #[cfg(target_os = "linux")]
+    {
+        PathBuf::from("/var/lib/commonmeta/commonmeta.sqlite3")
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    {
+        PathBuf::from("commonmeta.sqlite3")
+    }
+}
+
 async fn cmd_start(args: StartArgs) {
-    let database = match args.db {
-        None => None,
-        Some(ref path) => {
-            let path = path.clone();
-            match tokio::task::spawn_blocking(move || db::open(&path))
-                .await
-                .expect("spawn_blocking panicked")
-            {
-                Ok(db_path) => {
-                    tracing::info!(path = %db_path.display(), "using local sqlite database");
-                    Some(Arc::new(db_path))
-                }
-                Err(e) => {
-                    tracing::error!(error = %e, "failed to open database");
-                    std::process::exit(1);
-                }
+    // Precedence: --db flag > COMMONMETA_DB env (resolved by clap) > platform default.
+    let db_path = args.db.unwrap_or_else(platform_default_db_path);
+
+    let database = {
+        let path = db_path.clone();
+        match tokio::task::spawn_blocking(move || db::open(&path))
+            .await
+            .expect("spawn_blocking panicked")
+        {
+            Ok(Some(p)) => {
+                tracing::info!(path = %p.display(), "using local sqlite database");
+                Some(Arc::new(p))
+            }
+            Ok(None) => None,
+            Err(e) => {
+                tracing::error!(error = %e, "failed to open database");
+                std::process::exit(1);
             }
         }
     };

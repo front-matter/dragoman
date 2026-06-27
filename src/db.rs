@@ -56,18 +56,30 @@ fn connect(path: &PathBuf) -> Result<Connection, AppError> {
         .map_err(|e| AppError::Internal(format!("sqlite open '{}': {e}", path.display())))
 }
 
-/// Validate that `path` exists and can be opened as a SQLite database.
-/// Returns the path so the caller can store it in `AppState`.
-pub fn open(path: &std::path::Path) -> Result<PathBuf, AppError> {
+/// Validate that `path` can be opened as a SQLite database with a `works` table.
+///
+/// Returns `Ok(None)` when the file does not exist or contains no `works` table
+/// (e.g. a commonmeta database used only for organisations or settings).
+/// Returns `Err` only when the file exists but cannot be opened at all.
+pub fn open(path: &std::path::Path) -> Result<Option<PathBuf>, AppError> {
     if !path.exists() {
-        return Err(AppError::Internal(format!(
-            "sqlite file not found: '{}'",
-            path.display()
-        )));
+        tracing::warn!(path = %path.display(), "sqlite file not found, running without local database");
+        return Ok(None);
     }
     let path = path.to_path_buf();
-    connect(&path)?;
-    Ok(path)
+    let conn = connect(&path)?;
+    let has_works: bool = conn
+        .query_row(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='works'",
+            [],
+            |_| Ok(true),
+        )
+        .unwrap_or(false);
+    if !has_works {
+        tracing::info!(path = %path.display(), "sqlite database has no works table, running without local database");
+        return Ok(None);
+    }
+    Ok(Some(path))
 }
 
 /// Look up a single DOI in a commonmeta SQLite database.
@@ -142,11 +154,21 @@ mod tests {
     }
 
     #[test]
-    fn open_rejects_missing_file() {
+    fn open_returns_none_for_missing_file() {
         let result = open(Path::new("/nonexistent/path/db.sqlite3"));
-        assert!(result.is_err());
-        let msg = result.unwrap_err().to_string();
-        assert!(msg.contains("not found"), "unexpected error: {msg}");
+        assert!(matches!(result, Ok(None)), "expected Ok(None), got {result:?}");
+    }
+
+    #[test]
+    fn open_returns_none_when_no_works_table() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("no_works.sqlite3");
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch("CREATE TABLE organizations (id TEXT PRIMARY KEY, name TEXT);")
+            .unwrap();
+        drop(conn);
+        let result = open(&path);
+        assert!(matches!(result, Ok(None)), "expected Ok(None), got {result:?}");
     }
 
     #[test]
