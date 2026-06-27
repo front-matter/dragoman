@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>%VITE_APP_NAME% — %VITE_APP_DESCRIPTION%</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iNiIgZmlsbD0iI2RiMjc3NyIvPjxnIHRyYW5zZm9ybT0idHJhbnNsYXRlKDQsNCkiIGZpbGw9IndoaXRlIj48cGF0aCBkPSJNMTIgLjc1YTguMjUgOC4yNSAwIDAgMC00LjEzNSAxNS4zOWMuNjg2LjM5OCAxLjExNSAxLjE0MyAxLjExNSAxLjk0MlYxOGg1LjI1di0uMDA4YzAtLjc5OS40My0xLjU0NCAxLjExNS0xLjk0MkE4LjI1IDguMjUgMCAwIDAgMTIgLjc1WiIvPjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgZD0iTTkuMDEzIDE5LjlhLjc1Ljc1IDAgMCAxIC44NzctLjU5NyAxMS4zMTkgMTEuMzE5IDAgMCAwIDQuMjIgMCAuNzUuNzUgMCAxIDEgLjI4IDEuNDczIDEyLjgxOSAxMi44MTkgMCAwIDEtNC43OCAwIC43NS43NSAwIDAgMS0uNTk3LS44NzZaTTkgMjIuNWEuNzUuNzUgMCAwIDEgLjc1LS43NWg0LjVhLjc1Ljc1IDAgMCAxIDAgMS41aC00LjVBLjc1Ljc1IDAgMCAxIDkgMjIuNVoiIGNsaXAtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4K">
+    <script>
+      (function () {
+        const stored = localStorage.getItem('app-dark')
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (stored === 'true' || (stored === null && prefersDark)) {
+          document.documentElement.classList.add('dark')
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

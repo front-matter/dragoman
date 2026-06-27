@@ -2,14 +2,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::{
-    Router,
+    Json, Router,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Redirect, Response},
-    routing::get,
+    routing::{get, post},
 };
 use clap::{Args, Parser, Subcommand};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use tokio::signal::unix::{SignalKind, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -218,7 +218,7 @@ struct PidQuery {
 async fn index() -> impl IntoResponse {
     (
         [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
-        include_str!("../site/public/index.html"),
+        include_str!("../ui/dist/index.html"),
     )
 }
 
@@ -354,9 +354,69 @@ async fn resolve_url(
     .map_err(|e| AppError::Internal(e.to_string()))?
 }
 
+// ── /bibliography ─────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct BibliographyRequest {
+    items: Vec<BibRequestItem>,
+    style: Option<String>,
+    locale: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct BibRequestItem {
+    id: String,
+    data: String, // commonmeta JSON string
+}
+
+#[derive(Serialize)]
+struct BibliographyResponse {
+    items: Vec<BibResponseItem>,
+}
+
+#[derive(Serialize)]
+struct BibResponseItem {
+    id: String,
+    html: String,
+}
+
+async fn handle_bibliography(
+    Json(req): Json<BibliographyRequest>,
+) -> Result<Json<BibliographyResponse>, AppError> {
+    let style = req.style;
+    let locale = req.locale;
+    let items = req.items;
+
+    let results = tokio::task::spawn_blocking(move || {
+        items
+            .into_iter()
+            .map(|item| {
+                let data = commonmeta::read("commonmeta", &item.data)
+                    .map_err(|e| AppError::FetchError(e.to_string()))?;
+                let bytes = commonmeta::write_with_style(
+                    "citation",
+                    &data,
+                    style.as_deref(),
+                    locale.as_deref(),
+                )
+                .map_err(|e| AppError::FetchError(e.to_string()))?;
+                Ok(BibResponseItem {
+                    id: item.id,
+                    html: String::from_utf8_lossy(&bytes).into_owned(),
+                })
+            })
+            .collect::<Result<Vec<_>, AppError>>()
+    })
+    .await
+    .map_err(|e| AppError::Internal(e.to_string()))??;
+
+    Ok(Json(BibliographyResponse { items: results }))
+}
+
 fn build_app(state: AppState) -> Router {
     Router::new()
         .route("/", get(index))
+        .route("/bibliography", post(handle_bibliography))
         .route("/{*path}", get(handle_pid))
         .with_state(state)
 }

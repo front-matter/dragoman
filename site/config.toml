@@ -1,5 +1,0 @@
-base_url = "https://commonmeta.org"
-title = "dragoman"
-description = "DOI content negotiation server"
-compile_sass = false
-generate_feeds = false

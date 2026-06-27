@@ -791,9 +791,9 @@ dependencies = [
 
 [[package]]
 name = "commonmeta"
-version = "0.6.1"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca2cad4e05a9311a03f30f369364921974c305c93514c89fbdc358053f12058d"
+checksum = "306991dc079f6762724d4cf8905d2b8b335bdaa9bfcff1bd062f61e9de784337"
 dependencies = [
  "ammonia",
  "arrow",
@@ -1147,7 +1147,7 @@ dependencies = [
 
 [[package]]
 name = "dragoman"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "axum",
  "clap",
