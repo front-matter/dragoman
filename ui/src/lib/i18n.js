@@ -8,6 +8,8 @@ import pt from '../locales/pt.json'
 import zh from '../locales/zh.json'
 import ja from '../locales/ja.json'
 import ko from '../locales/ko.json'
+import sv from '../locales/sv.json'
+import nl from '../locales/nl.json'
 
 addMessages('en', en)
 addMessages('de', de)
@@ -18,6 +20,8 @@ addMessages('pt', pt)
 addMessages('zh', zh)
 addMessages('ja', ja)
 addMessages('ko', ko)
+addMessages('sv', sv)
+addMessages('nl', nl)
 
 export function setupI18n(initialLocale) {
   init({ fallbackLocale: 'en', initialLocale: initialLocale ?? 'en' })

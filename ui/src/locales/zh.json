@@ -20,5 +20,6 @@
   "docs.content_negotiation.format_param_label": "使用 <code>?format=</code> 代替 <code>Accept</code> 请求头：",
   "docs.content_negotiation.citation_style_label": "对于格式化引用，通过 <code>Accept</code> 请求头传递引用样式和语言（样式默认为 <code>apa</code>，语言默认为 <code>en-US</code>）：",
   "docs.content_negotiation.query_params_label": "或使用查询参数：",
-  "docs.content_negotiation.multiple_types_label": "支持按照 <a href=\"https://www.rfc-editor.org/rfc/rfc7231#section-5.3.2\" target=\"_blank\" rel=\"noreferrer\">RFC 7231</a> 使用 <code>q=</code> 权重指定多种内容类型："
+  "docs.content_negotiation.multiple_types_label": "支持按照 <a href=\"https://www.rfc-editor.org/rfc/rfc7231#section-5.3.2\" target=\"_blank\" rel=\"noreferrer\">RFC 7231</a> 使用 <code>q=</code> 权重指定多种内容类型：",
+  "footer.copyright": "Copyright &copy;2023&ndash;2026 Commonmeta。由 <a href=\"https://front-matter.de\" target=\"_blank\" rel=\"noreferrer\">Front Matter</a> 基于 <a href=\"https://github.com/front-matter/dragoman\" target=\"_blank\" rel=\"noreferrer\">dragoman</a> 和 <a href=\"https://github.com/front-matter/commonmeta-rs\" target=\"_blank\" rel=\"noreferrer\">commonmeta-rs</a> 构建。"
 }

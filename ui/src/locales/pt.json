@@ -20,5 +20,6 @@
   "docs.content_negotiation.format_param_label": "Use <code>?format=</code> em vez de um cabeçalho <code>Accept</code>:",
   "docs.content_negotiation.citation_style_label": "Para citações formatadas, passe o estilo e o idioma pelo cabeçalho <code>Accept</code> (estilo padrão: <code>apa</code>, idioma padrão: <code>en-US</code>):",
   "docs.content_negotiation.query_params_label": "Ou use parâmetros de consulta:",
-  "docs.content_negotiation.multiple_types_label": "Vários tipos de conteúdo com pesos <code>q=</code> são suportados conforme a <a href=\"https://www.rfc-editor.org/rfc/rfc7231#section-5.3.2\" target=\"_blank\" rel=\"noreferrer\">RFC 7231</a>:"
+  "docs.content_negotiation.multiple_types_label": "Vários tipos de conteúdo com pesos <code>q=</code> são suportados conforme a <a href=\"https://www.rfc-editor.org/rfc/rfc7231#section-5.3.2\" target=\"_blank\" rel=\"noreferrer\">RFC 7231</a>:",
+  "footer.copyright": "Copyright &copy;2023&ndash;2026 Commonmeta. Desenvolvido com <a href=\"https://github.com/front-matter/dragoman\" target=\"_blank\" rel=\"noreferrer\">dragoman</a> e <a href=\"https://github.com/front-matter/commonmeta-rs\" target=\"_blank\" rel=\"noreferrer\">commonmeta-rs</a> por <a href=\"https://front-matter.de\" target=\"_blank\" rel=\"noreferrer\">Front Matter</a>."
 }

@@ -19,7 +19,7 @@
   let bibDoi    = $state('')
   let bibStyle  = $state(localStorage.getItem('dragoman-style')  ?? 'apa')
   const initialLocale = localStorage.getItem('dragoman-locale') ?? (() => {
-    const supported = ['en-US','de-DE','fr-FR','es-ES','it-IT','pt-BR','zh-CN','ja-JP','ko-KR']
+    const supported = ['en-US','de-DE','fr-FR','es-ES','it-IT','ja-JP','ko-KR','nl-NL','pt-BR','sv-SE','zh-CN']
     const lang = navigator.language
     return supported.find(v => v === lang)
         ?? supported.find(v => v.startsWith(lang.split('-')[0] + '-'))
@@ -151,10 +151,12 @@
     { value: 'fr-FR', label: 'Français' },
     { value: 'es-ES', label: 'Español' },
     { value: 'it-IT', label: 'Italiano' },
-    { value: 'pt-BR', label: 'Português (Brasil)' },
-    { value: 'zh-CN', label: '中文（简体）' },
     { value: 'ja-JP', label: '日本語' },
     { value: 'ko-KR', label: '한국어' },
+    { value: 'nl-NL', label: 'Nederlands' },
+    { value: 'pt-BR', label: 'Português (Brasil)' },
+    { value: 'sv-SE', label: 'Svenska' },
+    { value: 'zh-CN', label: '中文（简体）' },
   ]
 
   const expFormats = [
@@ -802,14 +804,8 @@
   <!-- Footer -->
   <footer class="py-4 text-xs text-gray-700 dark:text-gray-300">
     <div class="max-w-4xl mx-auto px-6 flex items-center justify-between">
-      <span>
-        Copyright &copy;2023&ndash;2026 Commonmeta.
-        Built with <a href="https://github.com/front-matter/dragoman" target="_blank" rel="noreferrer"
-           class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">dragoman</a>
-        and <a href="https://github.com/front-matter/commonmeta-rs" target="_blank" rel="noreferrer"
-           class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">commonmeta-rs</a>
-        by <a href="https://front-matter.de" target="_blank" rel="noreferrer"
-           class="hover:text-gray-900 dark:hover:text-gray-100 transition-colors">Front Matter</a>.
+      <span class="[&_a]:hover:text-gray-900 dark:[&_a]:hover:text-gray-100 [&_a]:transition-colors">
+        {@html _('footer.copyright')}
       </span>
       <span class="flex items-center gap-3">
         <a href="mailto:info@front-matter.de" aria-label="Email"
